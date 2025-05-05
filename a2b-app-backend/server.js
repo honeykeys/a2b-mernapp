@@ -2,8 +2,7 @@ const express = require('express');
 require('dotenv').config();
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes')
-console.log('DEBUG: typeof authRoutes =', typeof authRoutes); // Add this line
-console.log('DEBUG: authRoutes =', authRoutes); // Add this line (optional)
+const predictionRoutes = require('./routes/predictionRoutes');
 
 
 const app = express();
@@ -12,6 +11,7 @@ connectDB();
 
 app.use(express.json({extended: false}));
 app.use('/api/auth', authRoutes);
+app.use('/api/predictions', predictionRoutes);
 
 app.get('/', (req, res) => res.send('API Running'));
 
