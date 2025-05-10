@@ -1,4 +1,4 @@
-/// backend/models/User.js
+// backend/models/User.js
 
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -18,28 +18,29 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      // Basic email format validation regex
       match: [
         /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
         'Please provide a valid email address',
       ],
     },
-    // Store the hashed password, never the plain text
     passwordHash: {
       type: String,
-      required: [true, 'Password hash is required'],
-      minlength: [6, 'Password must be at least 6 characters long (before hashing)'], // Note: Validation applies before hashing, adjust as needed
+      required: [true, 'Hashed password is required'],
       select: false, // Exclude passwordHash from query results by default
     },
-    // Optional: Store the user's official FPL manager ID
     fplTeamId: {
-      type: Number,
+      type: Number, // This is the FPL Manager ID
       required: false,
-      // Consider adding unique: true, sparse: true later if you want to ensure
-      // only one app user can link to a specific FPL ID, while allowing many users
-      // *not* to link an ID (sparse index ignores nulls for uniqueness).
+      default: null,
     },
-    // Add other fields like preferences, roles etc. as needed later
+    fplManagerHistory: {
+      type: mongoose.Schema.Types.Mixed, // Stores the raw JSON object from the FPL API
+      default: null,
+    },
+    fplHistoryLastUpdated: { // Tracks when the history was last successfully fetched
+      type: Date,
+      default: null,
+    }
     // roles: {
     //   type: [String],
     //   enum: ['user', 'admin'],
@@ -47,39 +48,30 @@ const userSchema = new mongoose.Schema(
     // }
   },
   {
-    // Add createdAt and updatedAt timestamps automatically
-    timestamps: true,
+    timestamps: true, // Add createdAt and updatedAt timestamps automatically
   }
 );
 
 // --- Mongoose Middleware ---
-
-// Hash password BEFORE saving a new user document
-userSchema.pre('save', async function (next) {
-  // Only run this function if password was modified (or is new)
-  if (!this.isModified('passwordHash')) {
-    return next();
-  }
-
-  try {
-    // Generate salt (randomness factor for hashing)
-    const salt = await bcrypt.genSalt(10); // 10 rounds is generally recommended
-    // Hash the password using the generated salt
-    this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
-    next();
-  } catch (error) {
-    next(error); // Pass error to Mongoose error handling
-  }
-});
+// The pre-save password hashing middleware has been REMOVED from here.
+// Hashing will now be handled in the controller layer before saving.
 
 // --- Mongoose Instance Methods ---
 
 // Method to compare entered password with the stored hash during login
 userSchema.methods.matchPassword = async function (enteredPassword) {
-    console.log('DEBUG matchPassword: Comparing entered password with stored hash...'); // Log method entry
+    // IMPORTANT: `this.passwordHash` will be undefined here if not explicitly selected
+    // in the query due to `select: false` in the schema.
+    // Ensure your login query does: User.findOne({ email }).select('+passwordHash');
+    if (!this.passwordHash) {
+        console.error('DEBUG matchPassword: passwordHash not selected on user document or not set.');
+        // This indicates a programming error (not selecting the hash) or data issue.
+        return false;
+    }
+    // console.log('DEBUG matchPassword: Comparing entered password with stored hash...'); // Already in controller
     try {
         const result = await bcrypt.compare(enteredPassword, this.passwordHash);
-        console.log('DEBUG matchPassword: bcrypt.compare result =', result); // Log bcrypt result
+        // console.log('DEBUG matchPassword: bcrypt.compare result =', result); // Already in controller
         return result;
     } catch (compareError) {
         console.error('DEBUG matchPassword: Error during bcrypt compare:', compareError);
@@ -90,6 +82,10 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 // --- Indexing ---
 userSchema.index({ username: 1 });
 userSchema.index({ email: 1 });
+// Consider an index on fplTeamId if you query by it often and it's unique/sparse
+// if (userSchema.path('fplTeamId').options.unique) {
+//   userSchema.index({ fplTeamId: 1 }, { unique: true, sparse: true });
+// }
 
 // --- Create and Export Model ---
 const User = mongoose.model('User', userSchema);

@@ -1,27 +1,48 @@
-# Dockerfile (Place in backend directory)
+# Dockerfile for fpl-mern-app/backend
 
-# Use an official Node runtime as a parent image
-# Choose a specific LTS version (e.g., 20) and consider Alpine for smaller images
-FROM node:20-alpine
+# ---- Base Node.js Image ----
+# Use an official Node.js LTS (Long Term Support) version.
+# 'alpine' variants are smaller but might lack some tools or have libc compatibility issues.
+# 'slim' or full debian-based images are generally safer bets for Node.js apps.
+FROM node:18-slim AS base
 
-# Set the working directory in the container
-WORKDIR /app
+# Set working directory
+WORKDIR /usr/src/app
 
 # Copy package.json and package-lock.json (or yarn.lock)
-# Copying these first leverages Docker cache if dependencies haven't changed
 COPY package*.json ./
 
-# Install dependencies (--only=production ensures only production deps are installed)
-# Use 'npm ci' for faster, more reliable installs in CI/CD environments
+# ---- Dependencies ----
+# Install app dependencies using a clean install if package-lock.json is present
+# This layer is cached if package files don't change.
+FROM base AS dependencies
 RUN npm ci --only=production
 
-# Bundle app source code inside the Docker image
-COPY . .
+# ---- Production Build (if you have a build step, e.g., for TypeScript) ----
+# If your backend is plain JavaScript and doesn't have a separate build step,
+# you can skip this stage or combine it.
+# FROM dependencies AS build
+# COPY . .
+# RUN npm run build # If you have a build script in package.json
 
-# Make your app's port available to the outside world
-# Replace 5001 with the port your backend server listens on
+# ---- Production Image ----
+# Copy dependencies and application code into a clean Node.js image.
+FROM base AS production
+
+# Set NODE_ENV to production
+ENV NODE_ENV=production
+# Expose the port the app runs on (should match your server.js)
+ENV PORT=5001
 EXPOSE 5001
 
+# Copy installed dependencies from the 'dependencies' stage
+COPY --from=dependencies /usr/src/app/node_modules ./node_modules
+
+# Copy the rest of your application code
+COPY . .
+
 # Define the command to run your app
-# Replace server.js with your actual entry point file
-CMD [ "node", "server.js" ]
+# This should match the "start" script in your package.json
+CMD ["node", "server.js"]
+# Or if your package.json start script is just "node server.js":
+# CMD ["npm", "start"]

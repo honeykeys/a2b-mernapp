@@ -1,12 +1,12 @@
-// backend/controllers/authController.js
-const User = require('../models/User');
+const User = require('../models/User'); // Ensure this path is correct
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs'); // Import bcrypt here
 const { validationResult } = require('express-validator');
 
 // Helper function to generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d', // Token expires in 30 days
+    expiresIn: process.env.JWT_TOKEN_EXPIRES_IN || '30d', // Use env var or default
   });
 };
 
@@ -14,7 +14,6 @@ const generateToken = (id) => {
 // @route   POST /api/auth/register
 // @access  Public
 const registerUser = async (req, res, next) => {
-  // Optional: Input validation using express-validator (defined in routes)
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -24,42 +23,62 @@ const registerUser = async (req, res, next) => {
 
   try {
     // Check if email or username already exists
-    let user = await User.findOne({ email });
-    if (user) {
+    let userByEmail = await User.findOne({ email });
+    if (userByEmail) {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
-    user = await User.findOne({ username });
-    if (user) {
+    let userByUsername = await User.findOne({ username });
+    if (userByUsername) {
         return res.status(400).json({ message: 'Username is already taken' });
     }
 
+    // Hashing logic is now in the controller
+    if (!password || password.length < 6) {
+        return res.status(400).json({ message: 'Password must be at least 6 characters long.' });
+    }
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create new user instance (password gets hashed by pre-save hook in User model)
-    user = new User({
+    // Create new user instance with the hashed password
+    const newUser = new User({
       username,
       email,
-      passwordHash: password, // Pass plain password, hook will hash it
-      fplTeamId: fplTeamId || null // Handle optional field
+      passwordHash: hashedPassword, // Store the hashed password
+      fplTeamId: fplTeamId || null
     });
 
     // Save user to database
-    await user.save();
+    const savedUser = await newUser.save();
 
-    // Generate token and send response
-    const token = generateToken(user._id);
+    // Generate token
+    const token = generateToken(savedUser._id);
+
+    // Check if the registered user is "A"
+    const isSpecialUserA = savedUser.email === process.env.SPECIAL_USER_A_EMAIL;
+    if (process.env.SPECIAL_USER_A_EMAIL) { // Log if the special email is configured
+        console.log(`DEBUG: Special User A Email configured: ${process.env.SPECIAL_USER_A_EMAIL}`);
+        console.log(`DEBUG: Registered user email: ${savedUser.email}, Is Special: ${isSpecialUserA}`);
+    } else {
+        console.warn('DEBUG: SPECIAL_USER_A_EMAIL environment variable is not set.');
+    }
+
+
+    // Send response
     res.status(201).json({ // 201 Created
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      fplTeamId: user.fplTeamId,
+      _id: savedUser._id,
+      username: savedUser.username,
+      email: savedUser.email,
+      fplTeamId: savedUser.fplTeamId,
       token: token,
+      isSpecialUserA: isSpecialUserA, // Add the flag here
     });
 
   } catch (error) {
-    console.error('Registration Error:', error.message);
-    // Pass error to global error handler (if you have one) or send generic error
+    console.error('Registration Error:', error.message, error.stack);
+    if (error.name === 'ValidationError') {
+        return res.status(400).json({ message: 'Validation error', errors: error.errors });
+    }
     res.status(500).json({ message: 'Server error during registration' });
-    // next(error); // Alternative using error handler middleware
   }
 };
 
@@ -67,7 +86,6 @@ const registerUser = async (req, res, next) => {
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = async (req, res, next) => {
-  // Optional: Input validation using express-validator (defined in routes)
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -76,42 +94,45 @@ const loginUser = async (req, res, next) => {
   const { email, password } = req.body;
 
   try {
-    // Check if user exists
-    // IMPORTANT: Need to explicitly select passwordHash as it's excluded by default in schema
+    // Check if user exists and select the passwordHash
     const user = await User.findOne({ email }).select('+passwordHash');
 
     if (!user) {
-      console.log('DEBUG Login: User not found.'); // Log if not found
-      return res.status(400).json({ message: 'Invalid credentials (email)' });
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
-    console.log('DEBUG Login: User found:', user.email); // Log if found
 
-    // Check if password matches using method defined in User model
-    console.log('DEBUG Login: Comparing password...');
+    // Check if password matches
     const isMatch = await user.matchPassword(password);
-    console.log('DEBUG Login: Password match result =', isMatch);
 
     if (!isMatch) {
-      console.log('DEBUG Login: Password did not match.');
-      return res.status(400).json({ message: 'Invalid credentials (password)' });
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Passwords match, generate token and send response
-    console.log('DEBUG Login: Password matched! Generating token...');
+    // Passwords match, generate token
     const token = generateToken(user._id);
+
+    // Check if the logged-in user is "A"
+    const isSpecialUserA = user.email === process.env.SPECIAL_USER_A_EMAIL;
+    if (process.env.SPECIAL_USER_A_EMAIL) { // Log if the special email is configured
+        console.log(`DEBUG: Special User A Email configured: ${process.env.SPECIAL_USER_A_EMAIL}`);
+        console.log(`DEBUG: Logged in user email: ${user.email}, Is Special: ${isSpecialUserA}`);
+    } else {
+        console.warn('DEBUG: SPECIAL_USER_A_EMAIL environment variable is not set.');
+    }
+
+    // Send response
     res.status(200).json({ // 200 OK
       _id: user._id,
       username: user.username,
       email: user.email,
       fplTeamId: user.fplTeamId,
       token: token,
+      isSpecialUserA: isSpecialUserA, // Add the flag here
     });
 
   } catch (error) {
-    console.error('Login Error:', error.message);
-    console.error('Login Error:', error.message)
+    console.error('Login Error:', error.message, error.stack);
     res.status(500).json({ message: 'Server error during login' });
-    // next(error);
   }
 };
 
