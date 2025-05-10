@@ -1,0 +1,27 @@
+# buildspec.yml (Example Placeholder)
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20 # Specify Node.js version for MERN backend/frontend if needed
+      # python: 3.11 # Specify Python version for ML service if needed
+    commands:
+      - echo "In install phase..."
+      - echo "Installing frontend dependencies..."
+      - cd frontend && npm install && cd ..
+      - echo "Installing backend dependencies..."
+      - cd backend && npm install && cd ..
+      # Add installation commands later (e.g., npm ci for Node, pip install for Python)
+  build:
+    commands:
+      - echo "In build phase..."
+      # Add build commands later (e.g., npm run build for React, packaging commands)
+  post_build:
+    commands:
+      - echo "In post_build phase..."
+      # Add post-build commands later (e.g., running tests, preparing artifacts)
+
+# artifacts: # Define build artifacts later
+#   files:
+#     - '**/*'
