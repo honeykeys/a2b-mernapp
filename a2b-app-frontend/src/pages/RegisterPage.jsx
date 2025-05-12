@@ -1,9 +1,7 @@
-// src/pages/RegisterPage.jsx
 import React, { useState, useContext } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext.jsx'; // Assuming AuthContext.jsx
-import { registerUser } from '../services/apiService'; // Adjust path as needed
-
+import { AuthContext } from '../context/AuthContext.jsx';
+import { registerUser } from '../services/apiService';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -19,7 +17,6 @@ import Avatar from '@mui/material/Avatar';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 
-// Styled components from the template
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -125,7 +122,6 @@ export default function SignUpPage() {
       tempErrors.confirmPassword = 'Passwords do not match.';
       isValid = false;
     }
-    // FPL Team ID is now required and must be a number
     if (!fplTeamId.trim()) {
         tempErrors.fplTeamId = 'FPL Team ID is required.';
         isValid = false;
@@ -152,11 +148,11 @@ export default function SignUpPage() {
         username,
         email,
         password,
-        fplTeamId: Number(fplTeamId), // Now always present and converted to Number
+        fplTeamId: Number(fplTeamId),
       };
       const registeredUserData = await registerUser(userDataToSubmit);
       login(registeredUserData);
-      navigate('/predictions'); // Or to dashboard
+      navigate('/predictions');
     } catch (err) {
       setFormError(err.message || 'Registration failed. Please try again.');
     } finally {
@@ -172,7 +168,7 @@ export default function SignUpPage() {
           <Box sx={{display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2}}>
             <Avatar sx={{ m: 1, bgcolor: 'transparent', width: 220, height: 112, p: 0 }}> {/* p:0 to remove padding if img fills it */}
               <img 
-                src="/icons/repa-logo.svg" // Path relative to the public folder
+                src="/icons/repa-logo.svg"
                 alt="FPL Assistant Logo" 
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
               />
@@ -264,7 +260,7 @@ export default function SignUpPage() {
             <FormControl error={!!errors.fplTeamId}>
               <FormLabel htmlFor="fplTeamId" sx={{textAlign: 'left'}}>FPL Team ID</FormLabel>
               <TextField
-                required // Added required prop
+                required
                 name="fplTeamId"
                 fullWidth
                 id="fplTeamId"

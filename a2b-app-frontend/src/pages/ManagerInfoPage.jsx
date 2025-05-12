@@ -1,4 +1,3 @@
-// src/pages/ManagerInfoPage.jsx
 import React, { useState, useEffect } from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -13,14 +12,13 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Divider from '@mui/material/Divider';
-import List from '@mui/material/List'; // <<<--- ADDED THIS IMPORT
-import ListItem from '@mui/material/ListItem'; // <<<--- ADDED THIS IMPORT
-import ListItemText from '@mui/material/ListItemText'; // <<<--- ADDED THIS IMPORT
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemText from '@mui/material/ListItemText';
 import PersonIcon from '@mui/icons-material/Person';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import HistoryIcon from '@mui/icons-material/History';
 import MemoryIcon from '@mui/icons-material/Memory';
-
 import { useAuth } from '../context/AuthContext.jsx';
 import { getFplManagerHistory } from '../services/apiService';
 

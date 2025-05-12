@@ -1,4 +1,3 @@
-// src/components/DashboardLayout.jsx
 import React, { useState } from 'react';
 import { Outlet, Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
@@ -15,24 +14,19 @@ import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import Button from '@mui/material/Button'; // For Logout button
-import CircularProgress from '@mui/material/CircularProgress'; // Added for loadingAuthState
-
-// Import navigation list items and icons
+import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress'; 
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import BarChartIcon from '@mui/icons-material/BarChart'; // For Predictions
-import NewspaperIcon from '@mui/icons-material/Newspaper'; // For News
-import PersonIcon from '@mui/icons-material/Person'; // For My Team / Manager Info
-import CakeIcon from '@mui/icons-material/Cake'; // For Birthday Page
+import BarChartIcon from '@mui/icons-material/BarChart';
+import NewspaperIcon from '@mui/icons-material/Newspaper';
+import PersonIcon from '@mui/icons-material/Person';
+import CakeIcon from '@mui/icons-material/Cake';
+import { useAuth } from '../context/AuthContext.jsx';
 
-// Import AuthContext hook
-import { useAuth } from '../context/AuthContext.jsx'; // Adjust path as needed
-
-// Path to your logo in the public folder
-const logoPath = "/icons/repa-logo.svg"; // Ensure this path is correct
+const logoPath = "/icons/repa-logo.svg";
 
 function Copyright(props) {
   return (
@@ -47,9 +41,7 @@ function Copyright(props) {
   );
 }
 
-const drawerWidth = 240; // Width of the sidebar drawer
-
-// Styled AppBar component (from MUI dashboard template)
+const drawerWidth = 240; 
 const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== 'open',
 })(({ theme, open }) => ({
@@ -68,11 +60,10 @@ const AppBar = styled(MuiAppBar, {
   }),
 }));
 
-// Styled Drawer component (from MUI dashboard template)
 const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })(
   ({ theme, open }) => ({
     '& .MuiDrawer-paper': {
-      position: 'relative', // Important for layout within the flex container
+      position: 'relative',
       whiteSpace: 'nowrap',
       width: drawerWidth,
       transition: theme.transitions.create('width', {
@@ -86,9 +77,9 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
           easing: theme.transitions.easing.sharp,
           duration: theme.transitions.duration.leavingScreen,
         }),
-        width: theme.spacing(7), // Width when closed (icon only)
+        width: theme.spacing(7),
         [theme.breakpoints.up('sm')]: {
-          width: theme.spacing(9), // Slightly wider on small screens and up when closed
+          width: theme.spacing(9),
         },
       }),
     },
@@ -96,24 +87,20 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
 );
 
 export default function DashboardLayout() {
-  const [open, setOpen] = useState(true); // Drawer open state
-  const { user, logout, loadingAuthState } = useAuth(); // Get user, logout, and loading state
+  const [open, setOpen] = useState(true); 
+  const { user, logout, loadingAuthState } = useAuth(); 
   const navigate = useNavigate();
-  const location = useLocation(); // To highlight active navigation link
-
+  const location = useLocation(); 
   const toggleDrawer = () => {
     setOpen(!open);
   };
 
   const handleLogout = () => {
     logout();
-    navigate('/login'); // Redirect to login page after logout
+    navigate('/login'); 
   };
   
-  // Determine if the special birthday link should be shown
   const isUserA = user?.isSpecialUserA === true;
-
-  // Define navigation list items
   const mainListItems = (
     <React.Fragment>
       <ListItemButton component={RouterLink} to="/dashboard" selected={location.pathname === '/dashboard' || location.pathname === '/'}>
@@ -145,11 +132,6 @@ export default function DashboardLayout() {
       )}
     </React.Fragment>
   );
-  
-  // Optional secondary list items
-  // const secondaryListItems = ( ... );
-
-  // Show a loading indicator while auth state is being determined
   if (loadingAuthState) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -164,7 +146,7 @@ export default function DashboardLayout() {
       <AppBar position="absolute" open={open}>
         <Toolbar
           sx={{
-            pr: '24px', // keep right padding when drawer closed
+            pr: '24px',
           }}
         >
           <IconButton
@@ -174,19 +156,14 @@ export default function DashboardLayout() {
             onClick={toggleDrawer}
             sx={{
               marginRight: '36px',
-              ...(open && { display: 'none' }), // Hide when drawer is open
+              ...(open && { display: 'none' }), 
             }}
           >
             <MenuIcon />
           </IconButton>
           
-          {/* Logo in AppBar */}
           <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
             <img src={logoPath} alt="FPL Assistant Logo" style={{ height: '40px' }} />
-            {/* Optional: Title next to logo */}
-            {/* <Typography component="h1" variant="h6" color="inherit" noWrap sx={{ ml: 2 }}>
-              FPL Assistant
-            </Typography> */}
           </Box>
 
           <Typography variant="subtitle1" sx={{ mr: 2 }}>
@@ -236,9 +213,9 @@ export default function DashboardLayout() {
           overflow: 'auto',
         }}
       >
-        <Toolbar /> {/* Necessary to offset content below the AppBar */}
+        <Toolbar /> {}
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-          {/* Outlet renders the component for the matched child route */}
+          {}
           <Outlet />
           <Copyright sx={{ pt: 4 }} />
         </Container>

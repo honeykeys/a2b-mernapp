@@ -1,4 +1,3 @@
-// src/pages/NewsFeedPage.jsx
 import React, { useState, useEffect } from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -10,9 +9,9 @@ import Divider from '@mui/material/Divider';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
-import NewspaperIcon from '@mui/icons-material/Newspaper'; // Icon for the page title
+import NewspaperIcon from '@mui/icons-material/Newspaper';
 
-import { getNewsFeed } from '../services/apiService'; // Adjust path as needed
+import { getNewsFeed } from '../services/apiService';
 
 function NewsFeedPage() {
   const [newsItems, setNewsItems] = useState([]);
@@ -25,7 +24,7 @@ function NewsFeedPage() {
       setError('');
       try {
         const data = await getNewsFeed();
-        setNewsItems(data || []); // Ensure newsItems is always an array
+        setNewsItems(data || []);
       } catch (err) {
         setError(err.message || 'Failed to fetch news feed.');
         console.error("News Feed Page Error:", err);
@@ -35,7 +34,7 @@ function NewsFeedPage() {
     };
 
     fetchNews();
-  }, []); // Empty dependency array, so it runs once on mount
+  }, []);
 
   if (loading) {
     return (
@@ -114,21 +113,12 @@ function NewsFeedPage() {
                     variant="body2" 
                     color="text.secondary"
                     sx={{
-                      // Simple text truncation for snippet
-                      // maxHeight: '4.5em', // Approx 3 lines
-                      // overflow: 'hidden',
-                      // textOverflow: 'ellipsis',
-                      // display: '-webkit-box',
-                      // WebkitLineClamp: 3, 
-                      // WebkitBoxOrient: 'vertical',
                     }}
                   >
                     {item.snippet}
                   </Typography>
                 )}
               </ListItem>
-              {/* Optional: Add a divider if you prefer it over Paper separation */}
-              {/* {index < newsItems.length - 1 && <Divider sx={{ my: 2 }} />} */}
             </Paper>
           ))}
         </List>

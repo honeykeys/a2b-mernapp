@@ -1,4 +1,3 @@
-// src/pages/HomePageContent.jsx
 import React, { useEffect, useState, useContext } from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -8,11 +7,9 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Link from '@mui/material/Link';
 import Divider from '@mui/material/Divider';
-import Stack from '@mui/material/Stack'; // For fixture item layout
-import EventIcon from '@mui/icons-material/Event'; // For kickoff time
-import ShieldIcon from '@mui/icons-material/Shield'; // For team difficulty (example)
-
-// Import your context and API services
+import Stack from '@mui/material/Stack'; // 
+import EventIcon from '@mui/icons-material/Event'; 
+import ShieldIcon from '@mui/icons-material/Shield'; 
 import { useAuth } from '../context/AuthContext.jsx';
 import {
     getFplManagerHistory,
@@ -20,9 +17,7 @@ import {
     getPreviousGameweekFixtures,
     getUpcomingFixtures,
     getNewsFeed
-} from '../services/apiService'; // Adjust path as needed
-
-// --- Widget Components ---
+} from '../services/apiService'; 
 
 const ManagerNameIdWidget = ({ name, id, isLoading }) => (
   <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: 140, textAlign: 'center' }}>
@@ -85,15 +80,13 @@ const CurrentGameweekInfoWidget = ({ gameweek, points, rank, isLoading }) => (
     )}
   </Paper>
 );
-
-// --- Enhanced PastFixturesWidget ---
 const PastFixturesWidget = ({ fixtures, gameweek, isLoading, error }) => (
   <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: 300 }}>
     <Typography variant="h6" gutterBottom>Results GW{gameweek || ''}</Typography>
     {isLoading && <Box sx={{display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1}}><CircularProgress /></Box>}
     {error && <Alert severity="error">{error}</Alert>}
     {!isLoading && !error && fixtures && fixtures.length > 0 ? (
-      <Box sx={{maxHeight: 240, overflowY: 'auto', pr: 1 /* padding for scrollbar */ }}>
+      <Box sx={{maxHeight: 240, overflowY: 'auto', pr: 1}}>
         {fixtures.map(fixture => (
           <Box key={fixture.fixture_id || fixture.id} sx={{ mb: 1, pb: 1, borderBottom: (theme) => `1px solid ${theme.palette.divider}` }}>
             <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
@@ -119,14 +112,13 @@ const PastFixturesWidget = ({ fixtures, gameweek, isLoading, error }) => (
   </Paper>
 );
 
-// --- Enhanced UpcomingFixturesWidget ---
 const UpcomingFixturesWidget = ({ fixtures, gameweek, isLoading, error }) => (
   <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: 300 }}>
     <Typography variant="h6" gutterBottom>Fixtures GW{gameweek || ''}</Typography>
     {isLoading && <Box sx={{display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1}}><CircularProgress /></Box>}
     {error && <Alert severity="error">{error}</Alert>}
     {!isLoading && !error && fixtures && fixtures.length > 0 ? (
-       <Box sx={{maxHeight: 240, overflowY: 'auto', pr: 1 /* padding for scrollbar */}}>
+       <Box sx={{maxHeight: 240, overflowY: 'auto', pr: 1}}>
         {fixtures.map(fixture => (
           <Box key={fixture.id} sx={{ mb: 1, pb: 1, borderBottom: (theme) => `1px solid ${theme.palette.divider}` }}>
             <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
@@ -214,8 +206,6 @@ function HomePageContent() {
   const [newsItems, setNewsItems] = useState([]);
   const [loadingNews, setLoadingNews] = useState(true);
   const [newsError, setNewsError] = useState('');
-
-  // Fetch Manager Data
   useEffect(() => {
     if (token && user?.fplTeamId) {
       setLoadingManagerData(true);
@@ -278,7 +268,7 @@ function HomePageContent() {
   useEffect(() => {
     if (currentSystemGameweek) {
         setUpcomingFixtures(prev => ({ ...prev, isLoading: true, error: '' }));
-        getUpcomingFixtures() // Assumes this function in apiService doesn't need currentSystemGameweek passed
+        getUpcomingFixtures()
             .then(data => {
                 setUpcomingFixtures({ gameweek: data.gameweek, fixtures: data.fixtures, isLoading: false, error: '' });
             })

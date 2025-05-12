@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext.jsx'; // Assuming AuthContext.jsx
-import { loginUser } from '../services/apiService'; // Adjust path as needed
+import { AuthContext } from '../context/AuthContext.jsx';
+import { loginUser } from '../services/apiService';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -18,10 +18,6 @@ import Avatar from '@mui/material/Avatar';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 
-// Import your custom SVG icon as a React component
-
-// Styled components from the template (Card and SignInContainer)
-// These are similar to the SignUpPage for consistency.
 const Card = styled(MuiCard)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -33,7 +29,7 @@ const Card = styled(MuiCard)(({ theme }) => ({
   boxShadow:
     'hsla(220, 30%, 5%, 0.05) 0px 5px 15px 0px, hsla(220, 25%, 10%, 0.05) 0px 15px 35px -5px',
   [theme.breakpoints.up('sm')]: {
-    width: '450px', // Max width for the card
+    width: '450px', 
   },
   ...(theme.palette.mode === 'dark' && {
     boxShadow:
@@ -87,8 +83,8 @@ export default function LoginPage() {
     email: '',
     password: '',
   });
-  const [errors, setErrors] = useState({}); // For field-specific errors
-  const [formError, setFormError] = useState(''); // For general API errors
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState(''); 
   const [loading, setLoading] = useState(false);
 
   const { login } = useContext(AuthContext);
@@ -112,7 +108,7 @@ export default function LoginPage() {
       tempErrors.email = 'Please enter a valid email address.';
       isValid = false;
     }
-    if (!password) { // Basic check, length validation can be added if desired
+    if (!password) { 
       tempErrors.password = 'Password is required.';
       isValid = false;
     }
@@ -130,7 +126,7 @@ export default function LoginPage() {
     try {
       const userData = await loginUser({ email, password });
       login(userData);
-      navigate('/predictions'); // Or to dashboard
+      navigate('/predictions'); 
     } catch (err) {
       setFormError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -146,7 +142,7 @@ export default function LoginPage() {
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
             <Avatar sx={{ m: 1, bgcolor: 'transparent', width: 220, height: 112 }}>
             <img 
-                src="/icons/repa-logo.svg" // Path relative to the public folder
+                src="/icons/repa-logo.svg" 
                 alt="FPL Assistant Logo" 
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
             />
@@ -162,12 +158,12 @@ export default function LoginPage() {
           <Box
             component="form"
             onSubmit={handleSubmit}
-            noValidate // Let our custom validation handle it
+            noValidate 
             sx={{
               display: 'flex',
               flexDirection: 'column',
               width: '100%',
-              gap: 2, // Spacing from template
+              gap: 2, 
             }}
           >
             <FormControl error={!!errors.email}>
@@ -209,23 +205,23 @@ export default function LoginPage() {
               />
             </FormControl>
             
-            {/* "Remember me" and "Forgot password" removed as per plan */}
+            {}
 
             <Button
               type="submit"
               fullWidth
               variant="contained"
-              sx={{ mt: 2 }} // Added some top margin
+              sx={{ mt: 2 }}
               disabled={loading}
-              onClick={handleSubmit} // Changed from template's validateInputs
+              onClick={handleSubmit}
             >
               {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign in'}
             </Button>
           </Box>
 
-          {/* Social login buttons and "or" divider removed */}
+          {}
 
-          <Typography sx={{ textAlign: 'center', mt: 2 }}> {/* Adjusted margin */}
+          <Typography sx={{ textAlign: 'center', mt: 2 }}> {}
             Don&apos;t have an account?{' '}
             <Link component={RouterLink} to="/register" variant="body2" sx={{ alignSelf: 'center' }}>
               Sign up

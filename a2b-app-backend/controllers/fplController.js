@@ -1,404 +1,263 @@
-// backend/controllers/fplController.js
 const axios = require('axios');
-const User = require('../models/User'); // Adjust path as needed
-const { parse } = require('csv-parse'); // For parsing CSV data
-const { Readable } = require('stream'); // To convert string to readable stream for parser
-const Parser = require('rss-parser'); // For parsing RSS feeds
+const User = require('../models/User');
+const { parse } = require('csv-parse');
+const { Readable } = require('stream');
+const Parser = require('rss-parser');
 
-// Helper function to create a consistent User-Agent and timeout config
 const getFplApiConfig = (timeout = 7000) => ({
   headers: { 'User-Agent': 'FPL-Assistant-App/1.0' },
-  timeout: timeout,
+  timeout,
 });
 
-// Initialize RSS Parser
 const rssParser = new Parser({
-    customFields: {
-        item: ['image', ['media:content', 'mediaContent', {keepArray: false}]],
-    }
+  customFields: {
+    item: ['image', ['media:content', 'mediaContent', { keepArray: false }]],
+  },
 });
 
-// --- Cache for bootstrap-static data (teams map) ---
 let teamNameMapCache = null;
 let teamCacheTimestamp = null;
-const TEAM_CACHE_DURATION_MS = 60 * 60 * 1000; // Cache team names for 1 hour
+const TEAM_CACHE_DURATION_MS = 60 * 60 * 1000;
 
 const getTeamNameMap = async () => {
-    if (teamNameMapCache && teamCacheTimestamp && (new Date() - teamCacheTimestamp < TEAM_CACHE_DURATION_MS)) {
-        console.log('Internal: Serving team name map from cache.');
-        return teamNameMapCache;
-    }
-    console.log('Internal: Fetching fresh team name map from bootstrap-static...');
-    try {
-        const bootstrapResponse = await axios.get('https://fantasy.premierleague.com/api/bootstrap-static/', getFplApiConfig());
-        const teams = bootstrapResponse.data.teams;
-        const newTeamNameMap = new Map();
-        teams.forEach(team => {
-            newTeamNameMap.set(team.id, team.name); // Using full name
-        });
-        teamNameMapCache = newTeamNameMap;
-        teamCacheTimestamp = new Date();
-        console.log('Internal: Team name map cached.');
-        return newTeamNameMap;
-    } catch (error) {
-        console.error('Internal: Failed to fetch or build team name map:', error.message);
-        // If fetching fails but we have an old cache, return it, otherwise throw
-        if (teamNameMapCache) {
-            console.warn('Internal: Serving stale team name map due to fetch error.');
-            return teamNameMapCache;
-        }
-        throw error;
-    }
-};
-
-
-// Internal helper to get current gameweek number
-const fetchCurrentGameweekNumber = async () => {
-  const fplBootstrapUrl = 'https://fantasy.premierleague.com/api/bootstrap-static/';
-  console.log('Internal: Fetching current gameweek number from FPL API...');
+  if (teamNameMapCache && teamCacheTimestamp && (new Date() - teamCacheTimestamp < TEAM_CACHE_DURATION_MS)) {
+    return teamNameMapCache;
+  }
   try {
-    const response = await axios.get(fplBootstrapUrl, getFplApiConfig());
-    const events = response.data.events;
-    if (!events || !Array.isArray(events)) {
-      throw new Error('Could not parse gameweek data from FPL API ("events" array not found).');
-    }
-    // Prioritize is_current
-    const currentEvent = events.find(event => event.is_current === true);
-    if (currentEvent && typeof currentEvent.id === 'number') {
-      console.log(`Internal: Current event found: GW${currentEvent.id}`);
-      return currentEvent.id;
-    }
-    // Fallback to is_next
-    const nextEvent = events.find(event => event.is_next === true);
-    if (nextEvent && typeof nextEvent.id === 'number') {
-      console.log(`Internal: No current event, next event found: GW${nextEvent.id}`);
-      return nextEvent.id;
-    }
-    // Fallback to latest finished event if no current/next (e.g., end of season)
-    const finishedEvents = events.filter(event => event.finished === true).sort((a,b) => b.id - a.id); // Sort descending
-    if (finishedEvents.length > 0 && typeof finishedEvents[0].id === 'number') {
-        console.log(`Internal: No current/next event, latest finished event found: GW${finishedEvents[0].id}`);
-        return finishedEvents[0].id;
-    }
-    // Fallback to earliest future unplayed (e.g. pre-season for next season)
-    const futureEvents = events.filter(event => event.finished === false && event.data_checked === false).sort((a,b) => a.id - b.id);
-    if (futureEvents.length > 0 && typeof futureEvents[0].id === 'number') {
-        console.log(`Internal: No current/next/finished, using earliest future GW: ${futureEvents[0].id}`);
-        return futureEvents[0].id;
-    }
-    throw new Error('Current, next, latest finished, or earliest future FPL gameweek not found in API response.');
+    const res = await axios.get('https://fantasy.premierleague.com/api/bootstrap-static/', getFplApiConfig());
+    const map = new Map();
+    res.data.teams.forEach(team => map.set(team.id, team.name));
+    teamNameMapCache = map;
+    teamCacheTimestamp = new Date();
+    return map;
   } catch (error) {
-    console.error('Internal: Error fetching current FPL gameweek:', error.message);
+    if (teamNameMapCache) return teamNameMapCache;
     throw error;
   }
 };
 
-// @desc    Get FPL manager data (general info + history) for the authenticated user
+const fetchCurrentGameweekNumber = async () => {
+  try {
+    const { data } = await axios.get('https://fantasy.premierleague.com/api/bootstrap-static/', getFplApiConfig());
+    const events = data.events || [];
+
+    const current = events.find(e => e.is_current);
+    if (current?.id) return current.id;
+
+    const next = events.find(e => e.is_next);
+    if (next?.id) return next.id;
+
+    const finished = events.filter(e => e.finished).sort((a, b) => b.id - a.id);
+    if (finished.length) return finished[0].id;
+
+    const future = events.filter(e => !e.finished && !e.data_checked).sort((a, b) => a.id - b.id);
+    if (future.length) return future[0].id;
+
+    throw new Error('Gameweek not found');
+  } catch (error) {
+    throw error;
+  }
+};
+
 const getFplManagerHistory = async (req, res) => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ message: 'Not authorized, no token or user ID found' });
-    }
+    if (!req.user?.id) return res.status(401).json({ message: 'Not authorized' });
+
     const user = await User.findById(req.user.id).select('+fplTeamId +fplManagerHistory +fplHistoryLastUpdated');
-    if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
-    }
-    if (!user.fplTeamId) {
-      return res.status(400).json({ message: 'FPL Team ID not set for this user.' });
-    }
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.fplTeamId) return res.status(400).json({ message: 'FPL Team ID not set' });
 
-    const fplManagerId = user.fplTeamId;
-    const fplHistoryUrl = `https://fantasy.premierleague.com/api/entry/${fplManagerId}/history/`;
-    const fplEntryUrl = `https://fantasy.premierleague.com/api/entry/${fplManagerId}/`;
-
-    let combinedData;
-    let responseSource = 'cache';
+    const id = user.fplTeamId;
+    const urls = [
+      axios.get(`https://fantasy.premierleague.com/api/entry/${id}/history/`, getFplApiConfig()),
+      axios.get(`https://fantasy.premierleague.com/api/entry/${id}/`, getFplApiConfig())
+    ];
 
     try {
-      console.log(`Attempting to fetch fresh FPL data for manager ID: ${fplManagerId}`);
-      const [historyResponse, entryResponse] = await Promise.all([
-        axios.get(fplHistoryUrl, getFplApiConfig()),
-        axios.get(fplEntryUrl, getFplApiConfig())
-      ]);
-      const historyData = historyResponse.data;
-      const entryData = entryResponse.data;
-      combinedData = {
-        history: historyData,
+      const [historyRes, entryRes] = await Promise.all(urls);
+      const data = {
+        history: historyRes.data,
         entry: {
-          id: entryData.id,
-          player_first_name: entryData.player_first_name,
-          player_last_name: entryData.player_last_name,
-          name: entryData.name,
-          summary_overall_points: entryData.summary_overall_points,
-          summary_overall_rank: entryData.summary_overall_rank,
-          summary_event_points: entryData.summary_event_points,
-          summary_event_rank: entryData.summary_event_rank,
-          current_event: entryData.current_event,
-          leagues: entryData.leagues,
-          player_region_name: entryData.player_region_name,
-          player_region_iso_code_long: entryData.player_region_iso_code_long,
-          favourite_team: entryData.favourite_team,
+          id: entryRes.data.id,
+          player_first_name: entryRes.data.player_first_name,
+          player_last_name: entryRes.data.player_last_name,
+          name: entryRes.data.name,
+          summary_overall_points: entryRes.data.summary_overall_points,
+          summary_overall_rank: entryRes.data.summary_overall_rank,
+          summary_event_points: entryRes.data.summary_event_points,
+          summary_event_rank: entryRes.data.summary_event_rank,
+          current_event: entryRes.data.current_event,
+          leagues: entryRes.data.leagues,
+          player_region_name: entryRes.data.player_region_name,
+          player_region_iso_code_long: entryRes.data.player_region_iso_code_long,
+          favourite_team: entryRes.data.favourite_team,
         },
       };
-      responseSource = 'live_api';
-      user.fplManagerHistory = combinedData;
+      user.fplManagerHistory = data;
       user.fplHistoryLastUpdated = new Date();
       await user.save();
-      console.log(`Successfully fetched and cached combined FPL data for manager ID: ${fplManagerId}`);
-      return res.json({ source: responseSource, data: combinedData });
-
+      return res.json({ source: 'live_api', data });
     } catch (apiError) {
-      console.warn(`Failed to fetch fresh FPL data for manager ID ${fplManagerId}: ${apiError.message}`);
-      if (apiError.isAxiosError && apiError.response) {
-        console.warn(`FPL API Error Status: ${apiError.response.status}`);
-      }
-      console.warn(`Attempting to serve from cache for user ${req.user.id}`);
-      if (user.fplManagerHistory && Object.keys(user.fplManagerHistory).length > 0) {
-        console.log(`Serving combined FPL data from cache for manager ID: ${fplManagerId}`);
+      if (user.fplManagerHistory) {
         return res.json({
           source: 'cache_api_error',
-          message: 'FPL API is currently unavailable. Serving last known data.',
+          message: 'FPL API unavailable. Serving cached data.',
           lastUpdated: user.fplHistoryLastUpdated,
           data: user.fplManagerHistory,
         });
-      } else {
-        console.error(`No cached FPL data found for manager ID ${fplManagerId} after API failure.`);
-        return res.status(503).json({
-          message: 'FPL API is unavailable and no cached data found.',
-          error: apiError.message,
-        });
       }
+      return res.status(503).json({
+        message: 'FPL API unavailable and no cached data.',
+        error: apiError.message,
+      });
     }
   } catch (error) {
-    console.error('Error in getFplManagerHistory controller:', error.message, error.stack);
-    res.status(500).json({ message: 'Server error while processing FPL manager data.' });
+    res.status(500).json({ message: 'Server error fetching manager history.' });
   }
 };
 
-// @desc    Get the current FPL gameweek number
 const getCurrentGameweekNumber = async (req, res) => {
-  console.log('API Call: Attempting to fetch current gameweek number...');
   try {
     const currentGameweek = await fetchCurrentGameweekNumber();
-    console.log(`API Call: Effective current FPL Gameweek determined as: ${currentGameweek}`);
     res.json({ currentGameweek });
   } catch (error) {
-    console.error('API Call Error: Error fetching current FPL gameweek:', error.message);
-    res.status(502).json({ message: 'Failed to fetch current gameweek data from FPL API.' });
+    res.status(502).json({ message: 'Failed to fetch gameweek.' });
   }
 };
 
-// @desc    Get fixtures and results for the previously completed FPL gameweek
 const getPreviousGameweekFixtures = async (req, res) => {
-  console.log('API Call: Attempting to fetch previous gameweek fixtures...');
   try {
-    const effectiveCurrentGameweek = await fetchCurrentGameweekNumber();
-    console.log(`API Call: Effective current GW for previous fixtures logic: ${effectiveCurrentGameweek}`);
+    const currentGW = await fetchCurrentGameweekNumber();
+    const previousGW = currentGW === 1 ? 38 : currentGW - 1;
+    const season = process.env.CURRENT_FPL_SEASON || '2023-24';
 
-    let previousGameweek;
-    const season = process.env.CURRENT_FPL_SEASON || '2023-24'; // Use env var or fallback
-    const lastGameweekOfSeason = 38; 
-
-    if (!effectiveCurrentGameweek) {
-        return res.status(500).json({ message: 'Could not determine current gameweek to calculate previous one.' });
-    }
-
-    if (effectiveCurrentGameweek === 1) {
-        previousGameweek = lastGameweekOfSeason;
-        console.log(`Current GW is 1, setting previous GW to ${lastGameweekOfSeason} of season ${season}`);
-    } else {
-        previousGameweek = effectiveCurrentGameweek - 1;
-    }
-    
-    if (previousGameweek < 1) {
-         return res.status(404).json({ message: `Calculated previous gameweek (${previousGameweek}) is invalid.` });
-    }
-
-    const vaastavFixturesUrl = `https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/data/${season}/fixtures.csv`;
-
-    console.log(`Fetching past fixtures CSV from: ${vaastavFixturesUrl} for GW${previousGameweek}`);
+    const csvUrl = `https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/data/${season}/fixtures.csv`;
     const [csvResponse, teamNameMap] = await Promise.all([
-        axios.get(vaastavFixturesUrl, { timeout: 10000 }),
-        getTeamNameMap()
+      axios.get(csvUrl, { timeout: 10000 }),
+      getTeamNameMap()
     ]);
-    const csvData = csvResponse.data;
 
-    const records = [];
-    const parser = Readable.from(csvData).pipe(parse({
+    const parser = Readable.from(csvResponse.data).pipe(parse({
       columns: true,
       skip_empty_lines: true,
       trim: true,
       cast: (value, context) => {
-        const numColumns = ['event', 'team_h_score', 'team_a_score', 'team_h', 'team_a', 'id'];
-        if (numColumns.includes(context.column)) {
-          const num = parseInt(value, 10);
-          return isNaN(num) ? null : num;
-        }
-        if (context.column === 'finished') {
-            return value.toLowerCase() === 'true';
-        }
+        const nums = ['event', 'team_h_score', 'team_a_score', 'team_h', 'team_a', 'id'];
+        if (nums.includes(context.column)) return parseInt(value, 10) || null;
+        if (context.column === 'finished') return value.toLowerCase() === 'true';
         return value;
       }
     }));
 
-    for await (const record of parser) {
-      records.push(record);
-    }
+    const records = [];
+    for await (const record of parser) records.push(record);
 
-    if (records.length === 0) {
-      return res.status(404).json({ message: `No fixture data found in CSV for season ${season}.` });
-    }
-
-    const previousGameweekFixtures = records
-      .filter(fixture => fixture.event === previousGameweek && fixture.finished === true)
-      .map(fixture => ({
-        fixture_id: fixture.id,
-        kickoff_time: fixture.kickoff_time,
-        home_team_id: fixture.team_h,
-        home_team_name: teamNameMap.get(fixture.team_h) || 'Unknown Team',
-        away_team_id: fixture.team_a,
-        away_team_name: teamNameMap.get(fixture.team_a) || 'Unknown Team',
-        home_team_score: fixture.team_h_score,
-        away_team_score: fixture.team_a_score,
-        gameweek: fixture.event
+    const fixtures = records
+      .filter(f => f.event === previousGW && f.finished)
+      .map(f => ({
+        fixture_id: f.id,
+        kickoff_time: f.kickoff_time,
+        home_team_id: f.team_h,
+        home_team_name: teamNameMap.get(f.team_h) || 'Unknown Team',
+        away_team_id: f.team_a,
+        away_team_name: teamNameMap.get(f.team_a) || 'Unknown Team',
+        home_team_score: f.team_h_score,
+        away_team_score: f.team_a_score,
+        gameweek: f.event,
       }));
 
-    if (previousGameweekFixtures.length === 0) {
-        return res.status(404).json({ message: `No finished fixtures found for GW${previousGameweek} in season ${season}. (Filter check)`});
+    if (!fixtures.length) {
+      return res.status(404).json({ message: `No finished fixtures found for GW${previousGW}` });
     }
-    
-    console.log(`Processed ${previousGameweekFixtures.length} unique fixtures for GW${previousGameweek}.`);
-    res.json({ gameweek: previousGameweek, season, fixtures: previousGameweekFixtures });
 
+    res.json({ gameweek: previousGW, season, fixtures });
   } catch (error) {
-    console.error('Error fetching previous gameweek fixtures:', error.message, error.stack);
-    if (error.isAxiosError && error.response && error.response.status === 404) {
-        return res.status(404).json({ message: `Data for previous gameweek not found at source (404). ${error.config?.url}` });
-    }
-    res.status(502).json({ message: 'Failed to fetch or process previous gameweek fixture data.' });
+    res.status(502).json({ message: 'Failed to fetch previous fixtures.' });
   }
 };
 
-// @desc    Get fixtures for the current/upcoming FPL gameweek
 const getUpcomingFixtures = async (req, res) => {
-  console.log('API Call: Attempting to fetch upcoming/live gameweek fixtures...');
   try {
     const currentGameweek = await fetchCurrentGameweekNumber();
-    if (!currentGameweek) {
-      return res.status(404).json({ message: 'Current gameweek could not be determined.' });
-    }
-
     const fplFixturesUrl = `https://fantasy.premierleague.com/api/fixtures/?event=${currentGameweek}`;
-    console.log(`Fetching upcoming fixtures from: ${fplFixturesUrl}`);
-
     const [response, teamNameMap] = await Promise.all([
-        axios.get(fplFixturesUrl, getFplApiConfig()),
-        getTeamNameMap()
+      axios.get(fplFixturesUrl, getFplApiConfig()),
+      getTeamNameMap()
     ]);
-    const fixturesData = response.data;
+    const fixtures = response.data;
 
-    if (!fixturesData || !Array.isArray(fixturesData)) {
-      console.error('FPL API Error: Fixtures data not found or not an array.');
-      return res.status(500).json({ message: 'Could not parse fixtures data from FPL API.' });
-    }
-
-    const processedFixtures = fixturesData.map(fixture => ({
-      id: fixture.id,
-      kickoff_time: fixture.kickoff_time,
-      gameweek: fixture.event,
-      home_team_id: fixture.team_h,
-      home_team_name: teamNameMap.get(fixture.team_h) || 'Unknown',
-      away_team_id: fixture.team_a,
-      away_team_name: teamNameMap.get(fixture.team_a) || 'Unknown',
-      finished: fixture.finished,
-      home_team_score: fixture.team_h_score,
-      away_team_score: fixture.team_a_score,
-      team_h_difficulty: fixture.team_h_difficulty,
-      team_a_difficulty: fixture.team_a_difficulty,
+    const data = fixtures.map(f => ({
+      id: f.id,
+      kickoff_time: f.kickoff_time,
+      gameweek: f.event,
+      home_team_id: f.team_h,
+      home_team_name: teamNameMap.get(f.team_h) || 'Unknown',
+      away_team_id: f.team_a,
+      away_team_name: teamNameMap.get(f.team_a) || 'Unknown',
+      finished: f.finished,
+      home_team_score: f.team_h_score,
+      away_team_score: f.team_a_score,
+      team_h_difficulty: f.team_h_difficulty,
+      team_a_difficulty: f.team_a_difficulty,
     }));
 
-    console.log(`Processed ${processedFixtures.length} upcoming fixtures for GW${currentGameweek}.`);
-    res.json({ gameweek: currentGameweek, fixtures: processedFixtures });
-
+    res.json({ gameweek: currentGameweek, fixtures: data });
   } catch (error) {
-    console.error('Error fetching upcoming fixtures:', error.message, error.stack);
-    if (error.isAxiosError && error.response) {
-      console.error('FPL API Response Status:', error.response.status);
-    }
-    res.status(502).json({ message: 'Failed to fetch upcoming fixture data from FPL API.' });
+    res.status(502).json({ message: 'Failed to fetch upcoming fixtures.' });
   }
 };
 
-// @desc    Get general FPL bootstrap-static data
-// @route   GET /api/fpl/bootstrap-static
-// @access  Public
 const getBootstrapStaticData = async (req, res) => {
-  const fplBootstrapUrl = 'https://fantasy.premierleague.com/api/bootstrap-static/';
-  console.log('API Call: Attempting to fetch bootstrap-static data from FPL API...');
   try {
-    const response = await axios.get(fplBootstrapUrl, getFplApiConfig());
-    console.log('Successfully fetched bootstrap-static data.');
-    res.json(response.data); // Send the whole bootstrap data
+    const { data } = await axios.get('https://fantasy.premierleague.com/api/bootstrap-static/', getFplApiConfig());
+    res.json(data);
   } catch (error) {
-    console.error('Error fetching bootstrap-static data:', error.message);
-    if (error.isAxiosError && error.response) {
-      console.error('FPL API Response Status:', error.response.status);
-    }
-    res.status(502).json({ message: 'Failed to fetch general FPL data.' });
+    res.status(502).json({ message: 'Failed to fetch bootstrap-static data.' });
   }
 };
 
-
-// --- Node.js News Aggregator ---
 const newsFeedCache = { items: [], lastFetched: null, cacheDurationMs: 30 * 60 * 1000 };
 const feedSources = [
-    { name: "BBC Sport - Football", url: "https://feeds.bbci.co.uk/sport/football/rss.xml" },
-    { name: "Football News Views - PL", url: "https://www.football-news-views.co.uk/premier-league-rss.xml" },
-    { name: "Football News Views - Spurs", url: "https://www.football-news-views.co.uk/tottenham-hotspurrss.xml" },
+  { name: "BBC Sport - Football", url: "https://feeds.bbci.co.uk/sport/football/rss.xml" },
+  { name: "Football News Views - PL", url: "https://www.football-news-views.co.uk/premier-league-rss.xml" },
+  { name: "Football News Views - Spurs", url: "https://www.football-news-views.co.uk/tottenham-hotspurrss.xml" },
 ];
+
 const getAggregatedNews = async (req, res) => {
-    console.log('API Call: Attempting to fetch aggregated news...');
-    if (newsFeedCache.lastFetched && (new Date() - newsFeedCache.lastFetched < newsFeedCache.cacheDurationMs)) {
-        console.log('Serving news from cache.');
-        return res.json(newsFeedCache.items);
+  if (newsFeedCache.lastFetched && (new Date() - newsFeedCache.lastFetched < newsFeedCache.cacheDurationMs)) {
+    return res.json(newsFeedCache.items);
+  }
+
+  let allItems = [];
+  for (const source of feedSources) {
+    try {
+      const feed = await rssParser.parseURL(source.url);
+      feed.items.forEach(item => {
+        allItems.push({
+          title: item.title || 'No Title',
+          link: item.link || '',
+          publication_date: item.pubDate ? new Date(item.pubDate).toISOString() : null,
+          source_name: source.name,
+          snippet: item.contentSnippet || item.content || '',
+        });
+      });
+    } catch (_) { }
+  }
+
+  const deduplicatedItems = [];
+  const seen = new Set();
+  allItems.sort((a, b) => new Date(b.publication_date) - new Date(a.publication_date));
+  allItems.forEach(item => {
+    if (!seen.has(item.link)) {
+      seen.add(item.link);
+      deduplicatedItems.push(item);
     }
-    console.log('Cache stale or empty. Fetching fresh news...');
-    let allItems = [];
-    for (const source of feedSources) {
-        try {
-            console.log(`Fetching news from: ${source.name} (${source.url})`);
-            const feed = await rssParser.parseURL(source.url);
-            feed.items.forEach(item => {
-                allItems.push({
-                    title: item.title || 'No Title',
-                    link: item.link || '',
-                    publication_date: item.pubDate ? new Date(item.pubDate).toISOString() : null,
-                    source_name: source.name,
-                    snippet: item.contentSnippet || item.content || '',
-                });
-            });
-        } catch (error) {
-            console.error(`Error fetching or parsing feed from ${source.name} (${source.url}):`, error.message);
-        }
-    }
-    allItems.sort((a, b) => {
-        if (a.publication_date && b.publication_date) {
-            return new Date(b.publication_date) - new Date(a.publication_date);
-        }
-        if (a.publication_date) return -1;
-        if (b.publication_date) return 1;
-        return 0;
-    });
-    const uniqueLinks = new Set();
-    const deduplicatedItems = allItems.filter(item => {
-        if (!item.link || uniqueLinks.has(item.link)) return false;
-        uniqueLinks.add(item.link);
-        return true;
-    });
-    newsFeedCache.items = deduplicatedItems;
-    newsFeedCache.lastFetched = new Date();
-    console.log(`Fetched and cached ${deduplicatedItems.length} news items.`);
-    res.json(deduplicatedItems);
+  });
+
+  newsFeedCache.items = deduplicatedItems;
+  newsFeedCache.lastFetched = new Date();
+
+  res.json(deduplicatedItems);
 };
 
 module.exports = {
@@ -407,5 +266,5 @@ module.exports = {
   getPreviousGameweekFixtures,
   getUpcomingFixtures,
   getAggregatedNews,
-  getBootstrapStaticData, // Export the new function
+  getBootstrapStaticData,
 };

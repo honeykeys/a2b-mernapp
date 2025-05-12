@@ -1,4 +1,3 @@
-// src/pages/PredictionsPage.jsx
 import React, { useState, useEffect, useMemo } from 'react';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -19,7 +18,6 @@ import { getLatestPredictions, getFplBootstrapData } from '../services/apiServic
 const positionMap = { 1: 'GK', 2: 'DEF', 3: 'MID', 4: 'FWD' };
 let teamMap = new Map();
 
-// Define columns for the DataGrid
 const columnsDefinition = [
   {
     field: 'photo',
@@ -51,7 +49,6 @@ const columnsDefinition = [
     width: 100,
     valueFormatter: (value) => value ? (value / 10).toFixed(1) : 'N/A',
   },
-  // Pred. Pts and Pred. Price Change columns are REMOVED from here
   { field: 'form', headerName: 'Form', type: 'number', width: 80, valueFormatter: (value) => value || 'N/A' },
   { field: 'total_points', headerName: 'Total Pts', type: 'number', width: 100 },
   { field: 'minutes', headerName: 'Mins', type: 'number', width: 80 },
@@ -66,7 +63,6 @@ const columnsDefinition = [
   { field: 'ep_next', headerName: 'EP Next', type: 'number', width: 90, valueFormatter: (value) => value ? parseFloat(value).toFixed(1) : 'N/A' },
   { field: 'selected_by_percent', headerName: 'Selected %', type: 'number', width: 110, valueFormatter: (value) => value ? `${parseFloat(value).toFixed(1)}%` : 'N/A' },
   { field: 'news', headerName: 'News', width: 150, sortable: false, valueFormatter: (value) => value || '' },
-  // Ensure 'id' field is present in your data objects for DataGrid row identification
 ];
 
 function PredictionsPage() {
@@ -178,8 +174,6 @@ function PredictionsPage() {
       <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3 }}>
         Explore player statistics and our model's predictions for the upcoming gameweek. Click a player for details.
       </Typography>
-      
-      {/* Prediction Info Boxes - Moved Above the Table */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6}>
           <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column', height: 180, justifyContent: 'center', alignItems: 'center' }}>
@@ -210,8 +204,6 @@ function PredictionsPage() {
           </Paper>
         </Grid>
       </Grid>
-      
-      {/* Selected Player Info Box (Optional, can be integrated differently or removed if redundant) */}
       {selectedPlayer && (
             <Paper sx={{ p: 2, mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
                 {selectedPlayer.photo && (
@@ -230,8 +222,6 @@ function PredictionsPage() {
                 </Box>
             </Paper>
       )}
-
-      {/* Main Table Area */}
       <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ mb: 2 }}>
           <TextField
