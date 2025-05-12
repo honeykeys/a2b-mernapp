@@ -13,18 +13,7 @@ A2B: Fantasy Premier League Enhanced By Machine Learning
 * [Key Features](#key-features)
 * [Technology Stack](#technology-stack)
 * [Architecture Overview](#architecture-overview)
-* [Screenshots (Coming Soon!)](#screenshots)
-* [Local Development Setup](#local-development-setup)
-    * [Prerequisites](#prerequisites)
-    * [Cloning](#cloning)
-    * [Environment Variables](#environment-variables)
-    * [Backend Setup (`a2b-app-backend`)](#backend-setup)
-    * [Frontend Setup (`a2b-app-frontend`)](#frontend-setup)
-    * [(Optional) ML Service Setup (`a2b-ml-service`)](#ml-service-setup)
-* [Deployment](#deployment)
-* [Known Limitations & Future Work (V3 Vision)](#known-limitations--future-work)
-* [Author & Contact](#author--contact)
-
+* [Screenshots](#screenshots)
 ---
 
 ## Project Overview
